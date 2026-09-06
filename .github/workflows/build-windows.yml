@@ -1,0 +1,52 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'ssh_mount_tool/**'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller pyinstaller-hooks-contrib
+
+    - name: Build EXE with PyInstaller
+      run: |
+        cd ssh_mount_tool
+        pyinstaller --onefile --windowed --name "SSHFS配置工具" --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.messagebox --hidden-import=tkinter.filedialog --add-data="mount_auto.bat;." config_gui.py
+
+    - name: Upload EXE artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SSHFS_Mount_Tool_EXE_Python${{ matrix.python-version }}
+        path: ssh_mount_tool/dist/SSHFS配置工具.exe
+        retention-days: 30
+
+    - name: Create Release
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ssh_mount_tool/dist/SSHFS配置工具.exe
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
